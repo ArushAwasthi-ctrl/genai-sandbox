@@ -1,0 +1,24 @@
+{
+  "name": "genai-sandbox",
+  "version": "1.0.0",
+  "main": "app.ts",
+  "scripts": {
+    "dev": "npx tsx --watch src/app.ts"
+  },
+  "type": "module",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@types/express": "^5.0.6",
+    "dotenv": "^17.2.4",
+    "express": "^5.2.1",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.1"
+  }
+}
