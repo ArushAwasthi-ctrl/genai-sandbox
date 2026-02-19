@@ -1,7 +1,7 @@
 import express from "express";
 import { callGroq } from "./groq.js";
 import { callGemini } from "./gemini.js";
-import { translateTemplate } from "./prompts/templates.js";
+import { translateTemplate, explainCodeTemplate, reviewTextTemplate } from "./prompts/templates.js";
 import { z } from "zod";
 
 
@@ -23,6 +23,18 @@ const OutputSchema = z.object({
 })
 const OutputSummary = z.object({
   summary: z.string().min(10)
+})
+const ReviewOutputSchema = z.object({
+  score: z.number().min(1).max(10),
+  issues: z.array(z.string()),
+  rewrite: z.string(),
+})
+const TestPromptInputSchema = z.object({
+  userinput: z.string().min(10),
+  systemprompt: z.string().min(10, "System prompt must be at least 10 characters"),
+  temperature: z.number().min(0).max(2).default(0.7),
+  runs: z.number().int().min(1).max(5).default(3),
+  provider: z.enum(["groq", "gemini"]).default("groq"),
 })
 
 
@@ -153,6 +165,108 @@ app.post("/translate", async (req, res) => {
   }
 });
 
+
+app.post("/explain-code", async (req, res) => {
+  const input = InputSchema.safeParse(req.body);
+  if (!input.success) {
+    res.status(400).json({ error: input.error.issues });
+    return;
+  }
+
+  const callProvider = input.data.provider === "gemini" ? callGemini : callGroq;
+
+  try {
+    const output = await callProvider({
+      systemprompt: explainCodeTemplate.systemprompt,
+      userprompt: input.data.userinput,
+      temperature: explainCodeTemplate.temperature,
+    });
+
+    res.json({ explanation: output, provider: input.data.provider });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+app.post("/review-text", async (req, res) => {
+  const input = InputSchema.safeParse(req.body);
+  if (!input.success) {
+    res.status(400).json({ error: input.error.issues });
+    return;
+  }
+
+  const callProvider = input.data.provider === "gemini" ? callGemini : callGroq;
+
+  try {
+    const output = await callProvider({
+      systemprompt: reviewTextTemplate.systemprompt,
+      userprompt: input.data.userinput,
+      temperature: reviewTextTemplate.temperature,
+    });
+
+    const parsed = JSON.parse(output);
+    const result = ReviewOutputSchema.safeParse(parsed);
+
+    if (result.success) {
+      res.json({ review: result.data, provider: input.data.provider });
+      return;
+    }
+
+    // Retry once with error feedback
+    const retryOutput = await callProvider({
+      userprompt: `Your previous response had errors: ${JSON.stringify(result.error.issues)}\n\nReview this text again: ${input.data.userinput}`,
+      systemprompt: reviewTextTemplate.systemprompt,
+      temperature: 0.1,
+    });
+    const retryResult = ReviewOutputSchema.safeParse(JSON.parse(retryOutput));
+
+    if (retryResult.success) {
+      res.json({ review: retryResult.data, provider: input.data.provider });
+      return;
+    }
+
+    res.status(500).json({ error: "LLM returned invalid format after retry", issues: retryResult.error.issues });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
+
+app.post("/test-prompt", async (req, res) => {
+  // Different input schema — accepts custom systemprompt, temperature, and runs
+  const input = TestPromptInputSchema.safeParse(req.body);
+  if (!input.success) {
+    res.status(400).json({ error: input.error.issues });
+    return;
+  }
+
+  const callProvider = input.data.provider === "gemini" ? callGemini : callGroq;
+
+  try {
+    // Run the same prompt N times in parallel using Promise.all
+    // This shows how temperature affects output — same input, different results
+    const promises = Array.from({ length: input.data.runs }, () =>
+      callProvider({
+        systemprompt: input.data.systemprompt,
+        userprompt: input.data.userinput,
+        temperature: input.data.temperature,
+      })
+    );
+
+    const results = await Promise.all(promises);
+
+    res.json({
+      results,
+      runs: input.data.runs,
+      temperature: input.data.temperature,
+      provider: input.data.provider,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+});
 
 app.listen(PORT, () => {
   console.log("server running on port " + PORT);
