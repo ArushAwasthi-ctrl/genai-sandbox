@@ -6,3 +6,4 @@ dist/
 *.js.map
 *.d.ts.map
 !src/**/*.js
+AI-Mock-Interviewer-Project.md

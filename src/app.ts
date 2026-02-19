@@ -2,6 +2,7 @@ import express from "express";
 import { callGroq } from "./groq.js";
 import { callGemini } from "./gemini.js";
 import { translateTemplate, explainCodeTemplate, reviewTextTemplate } from "./prompts/templates.js";
+import { tokenLogger } from "./middleware/tokenLogger.js";
 import { z } from "zod";
 
 
@@ -10,6 +11,7 @@ const PORT = 2402;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(tokenLogger);
 
 
 const InputSchema = z.object({
@@ -66,7 +68,9 @@ Rules:
   try {
     const callProvider = provider === "gemini" ? callGemini : callGroq;
     const output = await callProvider({ userprompt, systemprompt, temperature });
-    const parseOutput = JSON.parse(output);
+    res.locals.tokenUsage.push({ model: output.model, ...output.usage });
+
+    const parseOutput = JSON.parse(output.content);
     const result = OutputSummary.safeParse(parseOutput)
     if (result.success) {
       res.status(201).json({ summary: result.data, provider })
@@ -74,7 +78,9 @@ Rules:
     }
 
     const newOutput = await callProvider({ userprompt: `Your previous response had errors: ${JSON.stringify(result.error?.issues)}\n\nAnalyze this text again: ${input.data.userinput}`, systemprompt, temperature })
-    const newResult = OutputSummary.safeParse(JSON.parse(newOutput));
+    res.locals.tokenUsage.push({ model: newOutput.model, ...newOutput.usage });
+
+    const newResult = OutputSummary.safeParse(JSON.parse(newOutput.content));
     if (newResult.success) {
       res.status(201).json({ summary: newResult.data, provider })
       return;
@@ -107,13 +113,13 @@ Exact format:
 
   try {
     const output = await callProvider({
-      userprompt: input.data.userinput,  // use input.data, NOT req.body
+      userprompt: input.data.userinput,
       systemprompt,
       temperature: 0.2,
     });
+    res.locals.tokenUsage.push({ model: output.model, ...output.usage });
 
-
-    const parsed = JSON.parse(output);
+    const parsed = JSON.parse(output.content);
     const result = OutputSchema.safeParse(parsed);
 
     if (result.success) {
@@ -121,13 +127,14 @@ Exact format:
       return;
     }
 
-
     const retryOutput = await callProvider({
       userprompt: `Your previous response had errors: ${JSON.stringify(result.error.issues)}\n\nAnalyze this text again: ${input.data.userinput}`,
       systemprompt,
       temperature: 0.1,
     });
-    const retryParsed = JSON.parse(retryOutput);
+    res.locals.tokenUsage.push({ model: retryOutput.model, ...retryOutput.usage });
+
+    const retryParsed = JSON.parse(retryOutput.content);
     const retryResult = OutputSchema.safeParse(retryParsed);
 
     if (retryResult.success) {
@@ -157,8 +164,9 @@ app.post("/translate", async (req, res) => {
       userprompt: input.data.userinput,
       temperature: translateTemplate.temperature,
     });
+    res.locals.tokenUsage.push({ model: output.model, ...output.usage });
 
-    res.json({ translation: output, provider: input.data.provider });
+    res.json({ translation: output.content, provider: input.data.provider });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({ error: message });
@@ -181,8 +189,9 @@ app.post("/explain-code", async (req, res) => {
       userprompt: input.data.userinput,
       temperature: explainCodeTemplate.temperature,
     });
+    res.locals.tokenUsage.push({ model: output.model, ...output.usage });
 
-    res.json({ explanation: output, provider: input.data.provider });
+    res.json({ explanation: output.content, provider: input.data.provider });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     res.status(500).json({ error: message });
@@ -204,8 +213,9 @@ app.post("/review-text", async (req, res) => {
       userprompt: input.data.userinput,
       temperature: reviewTextTemplate.temperature,
     });
+    res.locals.tokenUsage.push({ model: output.model, ...output.usage });
 
-    const parsed = JSON.parse(output);
+    const parsed = JSON.parse(output.content);
     const result = ReviewOutputSchema.safeParse(parsed);
 
     if (result.success) {
@@ -219,7 +229,9 @@ app.post("/review-text", async (req, res) => {
       systemprompt: reviewTextTemplate.systemprompt,
       temperature: 0.1,
     });
-    const retryResult = ReviewOutputSchema.safeParse(JSON.parse(retryOutput));
+    res.locals.tokenUsage.push({ model: retryOutput.model, ...retryOutput.usage });
+
+    const retryResult = ReviewOutputSchema.safeParse(JSON.parse(retryOutput.content));
 
     if (retryResult.success) {
       res.json({ review: retryResult.data, provider: input.data.provider });
@@ -254,10 +266,15 @@ app.post("/test-prompt", async (req, res) => {
       })
     );
 
-    const results = await Promise.all(promises);
+    const outputs = await Promise.all(promises);
+
+    // Log token usage for every parallel run
+    for (const output of outputs) {
+      res.locals.tokenUsage.push({ model: output.model, ...output.usage });
+    }
 
     res.json({
-      results,
+      results: outputs.map(o => o.content),
       runs: input.data.runs,
       temperature: input.data.temperature,
       provider: input.data.provider,
