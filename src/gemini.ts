@@ -1,14 +1,16 @@
-import env from "dotenv/config";
+import "dotenv/config";
 
 interface Input {
   systemprompt: string;
   userprompt: string;
-  temprature: number;
+  temperature: number;
 }
-type URL = string | undefined;
-export const callGemini = async (input: Input): Promise<void> => {
-  const url: URL = process.env.GEMINI_API_URL ?? undefined;
-  const output = await fetch(url!, {
+
+export const callGemini = async (input: Input): Promise<string> => {
+  const url = process.env.GEMINI_API_URL;
+  if (!url) throw new Error("GEMINI_API_URL is not set");
+
+  const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -18,9 +20,16 @@ export const callGemini = async (input: Input): Promise<void> => {
         },
       ],
       generationConfig: {
-        temperature: input.temprature,
+        temperature: input.temperature,
       },
     }),
   });
-  console.log(output);
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`Gemini API error (${response.status}): ${errorBody}`);
+  }
+
+  const data = await response.json();
+  return data.candidates[0].content.parts[0].text;
 };
