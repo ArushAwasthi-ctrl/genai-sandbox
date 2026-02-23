@@ -1,6 +1,7 @@
 import express from "express";
-import { callGroq } from "./groq.js";
-import { callGemini } from "./gemini.js";
+import { streamText } from "ai";
+import { callGroq, GROQ_MODEL } from "./groq.js";
+import { callGemini, GEMINI_MODEL } from "./gemini.js";
 import { translateTemplate, explainCodeTemplate, reviewTextTemplate } from "./prompts/templates.js";
 import { tokenLogger } from "./middleware/tokenLogger.js";
 import { z } from "zod";
@@ -284,6 +285,38 @@ app.post("/test-prompt", async (req, res) => {
     res.status(500).json({ error: message });
   }
 });
+
+app.post("/stream-summary", async (req, res) => {
+  const input = InputSchema.safeParse(req.body)
+  if (!input.success) {
+    res.status(400).json({ error: input.error.issues });
+    return;
+  }
+  const userprompt = input.data.userinput;
+  const provider = input.data.provider ?? "groq";
+
+  const systemprompt = `You are a concise summary assistant. Provide output in JSON format only
+Example:
+{summary:string}
+Rules:
+- Output ONLY the summary, nothing else
+- Exactly 1-2 sentences, never more
+- Be direct and factual no introductions like "Here is a summary"
+- Capture the key points, skip minor details
+- Use simple, clear language`;
+  const temperature = 0.7;
+
+  const model = provider === "gemini" ? GEMINI_MODEL : GROQ_MODEL;
+  const result = streamText({
+    model,
+    system: systemprompt,
+    prompt: userprompt,
+    temperature,
+  });
+
+  result.pipeTextStreamToResponse(res);
+
+})
 
 app.listen(PORT, () => {
   console.log("server running on port " + PORT);

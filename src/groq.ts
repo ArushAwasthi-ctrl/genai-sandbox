@@ -1,6 +1,14 @@
 import "dotenv/config";
+import { generateText } from "ai";
+import { createOpenAI } from "@ai-sdk/openai";
 
-// Shared interfaces — gemini.ts imports these too
+const groq = createOpenAI({
+  baseURL: "https://api.groq.com/openai/v1",
+  apiKey: process.env.GROQ_API_KEY!,
+});
+
+export const GROQ_MODEL = groq("llama-3.3-70b-versatile");
+
 export interface LLMInput {
   systemprompt: string;
   userprompt: string;
@@ -17,44 +25,20 @@ export interface LLMOutput {
   };
 }
 
-const GROQ_MODEL = "llama-3.3-70b-versatile";
-
 export const callGroq = async (input: LLMInput): Promise<LLMOutput> => {
-  const url = process.env.GROQ_API_URL;
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!url || !apiKey) throw new Error("GROQ_API_URL or GROQ_API_KEY is not set");
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages: [
-        { role: "system", content: input.systemprompt },
-        { role: "user", content: input.userprompt },
-      ],
-      temperature: input.temperature,
-      max_tokens: 150,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Groq API error (${response.status}): ${errorBody}`);
-  }
-
-  // Groq (OpenAI format) returns usage: { prompt_tokens, completion_tokens, total_tokens }
-  const data = await response.json();
-  return {
-    content: data.choices[0].message.content,
+  const result = await generateText({
     model: GROQ_MODEL,
+    system: input.systemprompt,
+    prompt: input.userprompt,
+    temperature: input.temperature,
+  });
+  return {
+    content: result.text,
+    model: "llama-3.3-70b-versatile",
     usage: {
-      prompt_tokens: data.usage?.prompt_tokens ?? 0,
-      completion_tokens: data.usage?.completion_tokens ?? 0,
-      total_tokens: data.usage?.total_tokens ?? 0,
+      prompt_tokens: result.usage.inputTokens!,
+      completion_tokens: result.usage.outputTokens!,
+      total_tokens: result.usage.totalTokens!,
     },
   };
 };

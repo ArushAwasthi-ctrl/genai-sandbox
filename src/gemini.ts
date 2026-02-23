@@ -1,43 +1,28 @@
 import "dotenv/config";
+import { generateText } from "ai";
+import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { LLMInput, LLMOutput } from "./groq.js";
 
-const GEMINI_MODEL = "gemini-2.0-flash";
+const google = createGoogleGenerativeAI({
+  apiKey: process.env.GEMINI_API_KEY!,
+});
+
+export const GEMINI_MODEL = google("gemini-2.0-flash");
 
 export const callGemini = async (input: LLMInput): Promise<LLMOutput> => {
-  const url = process.env.GEMINI_API_URL;
-  if (!url) throw new Error("GEMINI_API_URL is not set");
-
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [
-        {
-          parts: [{ text: input.systemprompt + "\n\n" + input.userprompt }],
-        },
-      ],
-      generationConfig: {
-        temperature: input.temperature,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`Gemini API error (${response.status}): ${errorBody}`);
-  }
-
-  // Gemini uses different field names: promptTokenCount, candidatesTokenCount, totalTokenCount
-  // We normalize them to match Groq/OpenAI format: prompt_tokens, completion_tokens, total_tokens
-  const data = await response.json();
-  const meta = data.usageMetadata;
-  return {
-    content: data.candidates[0].content.parts[0].text,
+  const result = await generateText({
     model: GEMINI_MODEL,
+    system: input.systemprompt,
+    prompt: input.userprompt,
+    temperature: input.temperature,
+  });
+  return {
+    content: result.text,
+    model: "gemini-2.0-flash",
     usage: {
-      prompt_tokens: meta?.promptTokenCount ?? 0,
-      completion_tokens: meta?.candidatesTokenCount ?? 0,
-      total_tokens: meta?.totalTokenCount ?? 0,
+      prompt_tokens: result.usage.inputTokens!,
+      completion_tokens: result.usage.outputTokens!,
+      total_tokens: result.usage.totalTokens!,
     },
   };
 };
