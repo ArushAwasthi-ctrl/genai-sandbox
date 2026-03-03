@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Week 4 - Conversation Memory Playground</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #e0e0e0;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      padding: 20px 0;
+      border-bottom: 1px solid #333;
+      margin-bottom: 20px;
+    }
+
+    header h1 {
+      font-size: 1.8rem;
+      color: #4ecca3;
+      margin-bottom: 10px;
+    }
+
+    header p {
+      color: #888;
+      font-size: 0.9rem;
+    }
+
+    .config-panel {
+      background: #232342;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .config-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .config-group label {
+      font-size: 0.8rem;
+      color: #888;
+      margin-bottom: 5px;
+    }
+
+    .config-group select,
+    .config-group input {
+      background: #1a1a2e;
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 10px;
+      color: #e0e0e0;
+      font-size: 0.9rem;
+    }
+
+    .config-group select:focus,
+    .config-group input:focus {
+      outline: none;
+      border-color: #4ecca3;
+    }
+
+    .conversation-info {
+      background: #232342;
+      border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .conversation-info .id {
+      font-family: monospace;
+      color: #4ecca3;
+      font-size: 0.85rem;
+    }
+
+    .conversation-info .stats {
+      display: flex;
+      gap: 15px;
+      font-size: 0.85rem;
+      color: #888;
+    }
+
+    .conversation-info .stats span {
+      color: #4ecca3;
+    }
+
+    .chat-container {
+      background: #232342;
+      border-radius: 12px;
+      height: 400px;
+      overflow-y: auto;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .message {
+      margin-bottom: 15px;
+      padding: 12px 15px;
+      border-radius: 12px;
+      max-width: 80%;
+    }
+
+    .message.user {
+      background: #4ecca3;
+      color: #1a1a2e;
+      margin-left: auto;
+    }
+
+    .message.assistant {
+      background: #1a1a2e;
+      border: 1px solid #333;
+    }
+
+    .message .role {
+      font-size: 0.75rem;
+      font-weight: bold;
+      margin-bottom: 5px;
+      opacity: 0.7;
+    }
+
+    .message .content {
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+
+    .input-container {
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-container textarea {
+      flex: 1;
+      background: #1a1a2e;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 15px;
+      color: #e0e0e0;
+      font-size: 1rem;
+      resize: none;
+      height: 60px;
+    }
+
+    .input-container textarea:focus {
+      outline: none;
+      border-color: #4ecca3;
+    }
+
+    .btn {
+      background: #4ecca3;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 12px;
+      padding: 15px 25px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn:hover {
+      background: #3db892;
+      transform: translateY(-1px);
+    }
+
+    .btn:disabled {
+      background: #555;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: #333;
+      color: #e0e0e0;
+    }
+
+    .btn-secondary:hover {
+      background: #444;
+    }
+
+    .btn-danger {
+      background: #e74c3c;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #c0392b;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+      flex-wrap: wrap;
+    }
+
+    .strategy-info {
+      background: #1a1a2e;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+
+    .strategy-info h3 {
+      color: #4ecca3;
+      margin-bottom: 10px;
+      font-size: 0.9rem;
+    }
+
+    .strategy-info p {
+      font-size: 0.85rem;
+      color: #888;
+      line-height: 1.6;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #888;
+    }
+
+    .loading::after {
+      content: '';
+      width: 20px;
+      height: 20px;
+      border: 2px solid #4ecca3;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .streaming-indicator {
+      color: #4ecca3;
+      font-size: 0.85rem;
+      margin-top: 5px;
+    }
+
+    .summary-result {
+      background: #1a1a2e;
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 10px;
+      font-size: 0.9rem;
+    }
+
+    .summary-result h4 {
+      color: #4ecca3;
+      margin-bottom: 10px;
+    }
+
+    .summary-result pre {
+      white-space: pre-wrap;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🧠 Week 4: Conversation Memory</h1>
+      <p>Test multi-turn conversations with different memory strategies</p>
+    </header>
+
+    <!-- Configuration Panel -->
+    <div class="config-panel">
+      <div class="config-group">
+        <label>Memory Strategy</label>
+        <select id="strategy">
+          <option value="sliding-window">Sliding Window (default)</option>
+          <option value="full">Full History</option>
+          <option value="summary">Summary Memory</option>
+        </select>
+      </div>
+      <div class="config-group">
+        <label>Window Size</label>
+        <input type="number" id="windowSize" value="20" min="2" max="50">
+      </div>
+      <div class="config-group">
+        <label>Provider</label>
+        <select id="provider">
+          <option value="groq">Groq (Llama 3.3 70B)</option>
+          <option value="gemini">Gemini 2.0 Flash</option>
+        </select>
+      </div>
+      <div class="config-group">
+        <label>Temperature</label>
+        <input type="number" id="temperature" value="0.7" min="0" max="2" step="0.1">
+      </div>
+      <div class="config-group">
+        <label>Stream Response</label>
+        <select id="stream">
+          <option value="true">Yes</option>
+          <option value="false">No</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Conversation Info -->
+    <div class="conversation-info">
+      <div>
+        <span style="color: #888;">Conversation ID:</span>
+        <span class="id" id="conversationId">New conversation</span>
+      </div>
+      <div class="stats">
+        <div>Messages: <span id="messageCount">0</span></div>
+        <div>Tokens: <span id="tokenCount">0</span></div>
+      </div>
+    </div>
+
+    <!-- Chat Container -->
+    <div class="chat-container" id="chatContainer">
+      <div class="message assistant">
+        <div class="role">AI Assistant</div>
+        <div class="content">Hello! I'm your AI assistant with conversation memory. Try having a multi-turn conversation with me - I'll remember what you say! 
+
+Try saying something like:
+- "My name is Arush and I'm learning AI"
+- "What's my name?" (I should remember!)
+- "Summarize our conversation"</div>
+      </div>
+    </div>
+
+    <!-- Input -->
+    <div class="input-container">
+      <textarea id="userInput" placeholder="Type your message..." onkeydown="handleKeyDown(event)"></textarea>
+      <button class="btn" id="sendBtn" onclick="sendMessage()">Send</button>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions">
+      <button class="btn btn-secondary" onclick="newConversation()">New Chat</button>
+      <button class="btn btn-secondary" onclick="getConversationHistory()">View History</button>
+      <button class="btn btn-secondary" onclick="summarizeConversation()">Summarize</button>
+      <button class="btn btn-secondary" onclick="getIntent()">Classify Intent</button>
+      <button class="btn btn-danger" onclick="clearConversation()">Clear History</button>
+    </div>
+
+    <!-- Strategy Info -->
+    <div class="strategy-info">
+      <h3>📖 Memory Strategies Explained</h3>
+      <p><strong>Sliding Window:</strong> Sends only the last N messages. Good balance of context and token usage. Best for most cases.</p>
+      <p><strong>Full History:</strong> Sends ALL messages. Complete context but hits token limits on long conversations.</p>
+      <p><strong>Summary Memory:</strong> Old messages → LLM summary → cached. Best for very long conversations where old context matters.</p>
+    </div>
+  </div>
+
+  <script>
+    let conversationId = null;
+    let messageCount = 0;
+    let isStreaming = false;
+
+    // Generate unique ID
+    function generateId() {
+      return `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    // Add message to chat container
+    function addMessage(role, content) {
+      const container = document.getElementById('chatContainer');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${role}`;
+      messageDiv.innerHTML = `
+        <div class="role">${role === 'user' ? 'You' : 'AI Assistant'}</div>
+        <div class="content">${content}</div>
+      `;
+      container.appendChild(messageDiv);
+      container.scrollTop = container.scrollHeight;
+      return messageDiv;
+    }
+
+    // Update stats display
+    function updateStats() {
+      document.getElementById('messageCount').textContent = messageCount;
+      document.getElementById('conversationId').textContent = conversationId || 'New conversation';
+    }
+
+    // Send message
+    async function sendMessage() {
+      const input = document.getElementById('userInput');
+      const message = input.value.trim();
+      
+      if (!message || isStreaming) return;
+
+      // Generate conversation ID if not exists
+      if (!conversationId) {
+        conversationId = generateId();
+      }
+
+      // Add user message to UI
+      addMessage('user', message);
+      input.value = '';
+      messageCount++;
+
+      // Get config
+      const strategy = document.getElementById('strategy').value;
+      const windowSize = parseInt(document.getElementById('windowSize').value);
+      const provider = document.getElementById('provider').value;
+      const temperature = parseFloat(document.getElementById('temperature').value);
+      const stream = document.getElementById('stream').value === 'true';
+
+      // Disable send button
+      const sendBtn = document.getElementById('sendBtn');
+      sendBtn.disabled = true;
+      sendBtn.textContent = 'Thinking...';
+
+      try {
+        if (stream) {
+          // Streaming response
+          isStreaming = true;
+          const assistantDiv = addMessage('assistant', '');
+          const contentDiv = assistantDiv.querySelector('.content');
+          
+          // Add streaming indicator
+          const indicator = document.createElement('div');
+          indicator.className = 'streaming-indicator';
+          indicator.textContent = '⏳ Streaming...';
+          assistantDiv.appendChild(indicator);
+
+          const response = await fetch('http://localhost:2402/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message,
+              conversationId,
+              strategy,
+              windowSize,
+              provider,
+              temperature,
+              stream: true
+            })
+          });
+
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunk = decoder.decode(value);
+            contentDiv.textContent += chunk;
+            
+            // Scroll to bottom
+            const container = document.getElementById('chatContainer');
+            container.scrollTop = container.scrollHeight;
+          }
+
+          // Remove streaming indicator
+          indicator.remove();
+          isStreaming = false;
+        } else {
+          // Non-streaming response
+          const response = await fetch('http://localhost:2402/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message,
+              conversationId,
+              strategy,
+              windowSize,
+              provider,
+              temperature,
+              stream: false
+            })
+          });
+
+          const data = await response.json();
+          
+          if (data.error) {
+            addMessage('assistant', `Error: ${data.error}`);
+          } else {
+            addMessage('assistant', data.content);
+            messageCount++;
+            
+            // Update token count
+            if (data.usage) {
+              document.getElementById('tokenCount').textContent = data.usage.totalTokens;
+            }
+          }
+        }
+      } catch (error) {
+        addMessage('assistant', `Error: ${error.message}`);
+      }
+
+      // Re-enable send button
+      sendBtn.disabled = false;
+      sendBtn.textContent = 'Send';
+      updateStats();
+    }
+
+    // Handle Enter key
+    function handleKeyDown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    }
+
+    // New conversation
+    function newConversation() {
+      conversationId = null;
+      messageCount = 0;
+      document.getElementById('chatContainer').innerHTML = `
+        <div class="message assistant">
+          <div class="role">AI Assistant</div>
+          <div class="content">New conversation started! How can I help you?</div>
+        </div>
+      `;
+      updateStats();
+      document.getElementById('tokenCount').textContent = '0';
+    }
+
+    // Get conversation history
+    async function getConversationHistory() {
+      if (!conversationId) {
+        alert('No active conversation');
+        return;
+      }
+
+      const response = await fetch(`http://localhost:2402/conversation/${conversationId}`);
+      const data = await response.json();
+      
+      console.log('Conversation History:', data);
+      alert(`Check console for full history.\n\nMessages: ${data.messages?.length || 0}\nTokens: ${data.estimatedTokens || 0}`);
+    }
+
+    // Summarize conversation
+    async function summarizeConversation() {
+      if (!conversationId) {
+        alert('No active conversation');
+        return;
+      }
+
+      const provider = document.getElementById('provider').value;
+      
+      try {
+        const response = await fetch(`http://localhost:2402/conversation/${conversationId}/summarize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider })
+        });
+
+        const data = await response.json();
+        
+        if (data.error) {
+          alert('Error: ' + data.error);
+        } else {
+          const summary = data.summary;
+          const summaryHtml = `
+            <div class="summary-result">
+              <h4>📊 Conversation Summary</h4>
+              <p><strong>Topics:</strong> ${summary.mainTopics?.join(', ')}</p>
+              <p><strong>Key Points:</strong> ${summary.keyPoints?.join(', ')}</p>
+              <p><strong>User Intent:</strong> ${summary.userIntent}</p>
+              <p><strong>Sentiment:</strong> ${summary.sentiment}</p>
+              <p><strong>Summary:</strong> ${summary.summary}</p>
+            </div>
+          `;
+          
+          const container = document.getElementById('chatContainer');
+          const summaryDiv = document.createElement('div');
+          summaryDiv.innerHTML = summaryHtml;
+          container.appendChild(summaryDiv);
+          container.scrollTop = container.scrollHeight;
+        }
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+
+    // Get intent classification
+    async function getIntent() {
+      const input = document.getElementById('userInput');
+      const message = input.value.trim();
+      
+      if (!message) {
+        alert('Type a message first to classify its intent');
+        return;
+      }
+
+      const provider = document.getElementById('provider').value;
+      
+      try {
+        const response = await fetch('http://localhost:2402/intent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message, provider })
+        });
+
+        const data = await response.json();
+        
+        const intentHtml = `
+          <div class="summary-result">
+            <h4>🎯 Intent Classification</h4>
+            <p><strong>Intent:</strong> ${data.intent}</p>
+            <p><strong>Confidence:</strong> ${(data.confidence * 100).toFixed(1)}%</p>
+            <p><strong>Suggested Response:</strong> ${data.suggestedResponse}</p>
+          </div>
+        `;
+        
+        const container = document.getElementById('chatContainer');
+        const intentDiv = document.createElement('div');
+        intentDiv.innerHTML = intentHtml;
+        container.appendChild(intentDiv);
+        container.scrollTop = container.scrollHeight;
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+
+    // Clear conversation history
+    async function clearConversation() {
+      if (!conversationId) {
+        alert('No active conversation');
+        return;
+      }
+
+      if (!confirm('Clear conversation history?')) return;
+
+      try {
+        await fetch(`http://localhost:2402/conversation/${conversationId}/clear`, {
+          method: 'POST'
+        });
+
+        messageCount = 0;
+        document.getElementById('chatContainer').innerHTML = `
+          <div class="message assistant">
+            <div class="role">AI Assistant</div>
+            <div class="content">Conversation history cleared. Starting fresh!</div>
+          </div>
+        `;
+        updateStats();
+        document.getElementById('tokenCount').textContent = '0';
+      } catch (error) {
+        alert('Error: ' + error.message);
+      }
+    }
+
+    // Initialize
+    updateStats();
+  </script>
+</body>
+</html>

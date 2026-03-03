@@ -3,7 +3,7 @@ import { generateText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { LLMInput, LLMOutput } from "./groq.js";
 
-const google = createGoogleGenerativeAI({
+ export const google = createGoogleGenerativeAI({
   apiKey: process.env.GEMINI_API_KEY!,
 });
 

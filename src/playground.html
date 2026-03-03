@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Streaming Playground</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 700px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 24px;
+      color: #ffffff;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: #999;
+      margin-bottom: 6px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 120px;
+      padding: 12px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      font-size: 0.95rem;
+      resize: vertical;
+      margin-bottom: 16px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    select {
+      padding: 10px 14px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      font-size: 0.9rem;
+    }
+
+    button {
+      padding: 10px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    #streamBtn {
+      background: #3b82f6;
+      color: white;
+    }
+    #streamBtn:disabled {
+      background: #1e3a5f;
+      cursor: not-allowed;
+    }
+
+    #clearBtn {
+      background: #333;
+      color: #e0e0e0;
+    }
+
+    #output {
+      min-height: 100px;
+      padding: 16px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background: #1a1a1a;
+      white-space: pre-wrap;
+      line-height: 1.6;
+      font-size: 0.95rem;
+    }
+
+    #output.streaming {
+      border-color: #3b82f6;
+    }
+
+    .status {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Streaming Playground</h1>
+
+    <label for="input">Text to summarize</label>
+    <textarea id="input" placeholder="Paste a paragraph here..."></textarea>
+
+    <div class="controls">
+      <select id="provider">
+        <option value="groq">Groq (Llama 3.3)</option>
+        <option value="gemini">Gemini 2.0 Flash</option>
+      </select>
+      <button id="streamBtn">Stream</button>
+      <button id="clearBtn">Clear</button>
+    </div>
+
+    <label>Output</label>
+    <div id="output"></div>
+    <div class="status" id="status"></div>
+  </div>
+
+  <script>
+    const input = document.getElementById("input");
+    const provider = document.getElementById("provider");
+    const streamBtn = document.getElementById("streamBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const output = document.getElementById("output");
+    const status = document.getElementById("status");
+
+    clearBtn.addEventListener("click", () => {
+      output.textContent = "";
+      status.textContent = "";
+    });
+
+    streamBtn.addEventListener("click", async () => {
+      const text = input.value.trim();
+      if (text.length < 10) {
+        status.textContent = "Input must be at least 10 characters.";
+        return;
+      }
+
+      // Reset UI
+      output.textContent = "";
+      status.textContent = "Streaming...";
+      streamBtn.disabled = true;
+      output.classList.add("streaming");
+
+      try {
+        // Step 1: Send POST request to our streaming endpoint
+        const response = await fetch("/stream-summary", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userinput: text,
+            provider: provider.value,
+          }),
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          status.textContent = "Error: " + (err.error || response.statusText);
+          return;
+        }
+
+        // Step 2: Get a reader from the response body stream
+        const reader = response.body.getReader();
+
+        // Step 3: Create a decoder to convert raw bytes to text
+        const decoder = new TextDecoder();
+
+        // Step 4: Read chunks in a loop until the stream is done
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          // Step 5: Decode the chunk and append it to the output
+          const chunk = decoder.decode(value, { stream: true });
+          output.textContent += chunk;
+        }
+
+        status.textContent = "Done.";
+      } catch (err) {
+        status.textContent = "Error: " + err.message;
+      } finally {
+        streamBtn.disabled = false;
+        output.classList.remove("streaming");
+      }
+    });
+  </script>
+</body>
+</html>
