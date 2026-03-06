@@ -35,7 +35,13 @@ export async function loadFAQs() {
     })
     return cachedFAQs;
 }
-
+export async function embedManyText(text: string[]): Promise<number[][]> {
+    const { embeddings } = await embedMany({
+        model: embedModel,
+        values: text
+    })
+    return embeddings;
+}
 export async function semanticSearch(query: string, topK: number) {
     const queryVector = await embedText(query);
     const FAQs: FAQ[] = await loadFAQs();

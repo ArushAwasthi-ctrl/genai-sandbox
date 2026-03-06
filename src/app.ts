@@ -6,6 +6,7 @@ import { callGroq, GROQ_MODEL } from "./groq.js";
 import { callGemini, GEMINI_MODEL } from "./gemini.js";
 import { translateTemplate, explainCodeTemplate, reviewTextTemplate } from "./prompts/templates.js";
 import { tokenLogger } from "./middleware/tokenLogger.js";
+import { ingestDocument, askQuestion, getDocuments } from "./rag/ragService.js";
 // =============================================================================
 // WEEK 4 IMPORTS - Conversation Memory
 // =============================================================================
@@ -511,10 +512,10 @@ app.get("/conversation/:id/stats", (req, res) => {
  */
 app.delete("/conversation/:id", (req, res) => {
   const { id } = req.params;
-  
+
   // Clear summary cache
   clearSummaryCache(id);
-  
+
   // Delete conversation
   const deleted = deleteConversation(id);
 
@@ -755,6 +756,41 @@ app.post("/search", async (req, res) => {
     res.status(500).json({ error: message });
   }
 });
+app.post('/rag/ingest', async (req, res) => {
+
+  const { title, content } = req.body
+  if (!title || typeof title !== "string" || !content || typeof content !== "string") {
+    res.status(400).json({ error: "text is required and must be a string" });
+    return;
+  }
+  try {
+    const result = await ingestDocument(title, content)
+    return res.status(201).json(result)
+  } catch (error) {
+    console.error("Ingest error:", error)
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+})
+
+app.post('/rag/ask', async (req, res) => {
+  const { question, topK } = req.body;
+  if (!question || typeof question !== "string") {
+    res.status(400).json({ error: "question is required and must be a string" });
+    return;
+  }
+  try {
+    const result = await askQuestion(question, topK)
+    return res.status(200).json(result)
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+})
+
+app.get('/rag/documents', (req, res) => {
+  res.json(getDocuments())
+})
 
 app.listen(PORT, () => {
   console.log("server running on port " + PORT);
