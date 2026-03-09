@@ -7,6 +7,8 @@ import { callGemini, GEMINI_MODEL } from "./gemini.js";
 import { translateTemplate, explainCodeTemplate, reviewTextTemplate } from "./prompts/templates.js";
 import { tokenLogger } from "./middleware/tokenLogger.js";
 import { ingestDocument, askQuestion, getDocuments } from "./rag/ragService.js";
+import { toolService } from "./services/tools.service.js";
+import { allTools } from "./tools/index.js";
 // =============================================================================
 // WEEK 4 IMPORTS - Conversation Memory
 // =============================================================================
@@ -790,6 +792,33 @@ app.post('/rag/ask', async (req, res) => {
 
 app.get('/rag/documents', (req, res) => {
   res.json(getDocuments())
+})
+
+// =============================================================================
+// WEEK 7 ENDPOINTS - Tool Calling & Agent
+// =============================================================================
+
+app.post('/tool-chat', async (req, res) => {
+  const { message } = req.body;
+  if (!message || typeof message !== "string") {
+    res.status(400).json({ error: "message is required and must be a string" });
+    return;
+  }
+  try {
+    const result = await toolService(message);
+    res.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    res.status(500).json({ error: message });
+  }
+})
+
+app.get('/tools', (req, res) => {
+  const tools = Object.entries(allTools).map(([name, tool]) => ({
+    name,
+    description: tool.description
+  }));
+  res.json({ tools, count: tools.length });
 })
 
 app.listen(PORT, () => {

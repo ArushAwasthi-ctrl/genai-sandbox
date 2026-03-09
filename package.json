@@ -12,6 +12,7 @@
   "description": "",
   "dependencies": {
     "@ai-sdk/google": "^3.0.30",
+    "@ai-sdk/groq": "^3.0.29",
     "@ai-sdk/openai": "^3.0.30",
     "@qdrant/js-client-rest": "^1.17.0",
     "@types/express": "^5.0.6",

@@ -1,9 +1,8 @@
 import "dotenv/config";
 import { generateText } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
+import { createGroq } from "@ai-sdk/groq";
 
-const groq = createOpenAI({
-  baseURL: "https://api.groq.com/openai/v1",
+export const groq = createGroq({
   apiKey: process.env.GROQ_API_KEY!,
 });
 

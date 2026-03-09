@@ -41,7 +41,13 @@ export async function askQuestion(question: string, topK = 3) {
         usage: response.usage
     }
 }
-
+export async function retrieveChunks(question: string, topK = 3) {
+    await ensureCollection(dbName)
+    const embedding = await embedText(question)
+    const results = await searchSimilar(dbName, embedding, topK)
+    const chunks = results.map((point: any) => point.payload as { text: string, docTitle: string, chunkIndex: number })
+    return chunks
+}
 export function getDocuments() {
     return ingestedDocs;
 }
